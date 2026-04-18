@@ -694,3 +694,20 @@ body {
   border-radius: var(--radius);
   line-height: 1.6;
 }
+
+/* Done speaking button */
+.done-btn {
+  margin-top: 0.75rem;
+  padding: 0.6rem 1.5rem;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 99px;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+.done-btn:hover { background: #059669; }
+.done-btn:active { transform: scale(0.97); }
