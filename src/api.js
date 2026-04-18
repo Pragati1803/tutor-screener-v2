@@ -1,8 +1,12 @@
-export async function sendMessage(messages) {
+export async function sendMessage(messages, candidate = {}) {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({
+      messages,
+      candidateName: candidate.name || '',
+      candidateSubject: candidate.role || '',
+    }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
