@@ -14,9 +14,10 @@ export default function InterviewPage({ candidate, onComplete }) {
   const [pulseLevel, setPulseLevel] = useState(0);
   const { isListening, isSpeaking, speak, startListening } = useSpeech();
   const isInterviewDone = useRef(false);
-  const capturedText = useRef('');
   const pulseRef = useRef(null);
   const transcriptEndRef = useRef(null);
+  const messagesRef = useRef([]);
+  const questionCountRef = useRef(0);
 
   useEffect(() => {
     if (isListening) {
@@ -38,35 +39,43 @@ export default function InterviewPage({ candidate, onComplete }) {
     speak(text, afterSpeak);
   }, [speak]);
 
-  const processAnswer = useCallback(async (candidateText, currentMessages, currentQuestionCount) => {
-    if (!candidateText.trim()) {
-      setStatusText('No answer detected — please try again');
-      setTimeout(() => listenToCandidate(currentMessages, currentQuestionCount), 1500);
+  const processAnswer = useCallback(async (candidateText) => {
+    const currentMessages = messagesRef.current;
+    const currentCount = questionCountRef.current;
+
+    if (!candidateText || !candidateText.trim()) {
+      setStatusText('Didn\'t catch that — please speak clearly and try again');
+      setTimeout(() => listenToCandidate(), 2000);
       return;
     }
 
     setPhase(PHASES.PROCESSING);
     setStatusText('Processing…');
+    setLiveText('');
 
     const userMsg = { role: 'user', content: candidateText };
     const updatedMessages = [...currentMessages, userMsg];
+    messagesRef.current = updatedMessages;
     setMessages(updatedMessages);
     setTranscript(prev => [...prev, { speaker: 'You', text: candidateText }]);
 
     try {
-      const { reply } = await sendMessage(updatedMessages);
+      const { reply } = await sendMessage(updatedMessages, candidate);
       const assistantMsg = { role: 'assistant', content: reply };
       const finalMessages = [...updatedMessages, assistantMsg];
+      messagesRef.current = finalMessages;
       setMessages(finalMessages);
       setTranscript(prev => [...prev, { speaker: 'Aria', text: reply }]);
 
-      const newCount = currentQuestionCount + 1;
+      const newCount = currentCount + 1;
+      questionCountRef.current = newCount;
       setQuestionCount(newCount);
 
       const isDone =
         reply.toLowerCase().includes('interview is complete') ||
         reply.toLowerCase().includes('that concludes') ||
-        reply.toLowerCase().includes('thank you for your time') ||
+        reply.toLowerCase().includes('thank you for') ||
+        reply.toLowerCase().includes('best of luck') ||
         newCount >= 6;
 
       if (isDone && !isInterviewDone.current) {
@@ -75,54 +84,48 @@ export default function InterviewPage({ candidate, onComplete }) {
           setPhase(PHASES.DONE);
           setStatusText('Generating your assessment…');
           const fullTranscript = finalMessages
+            .filter(m => m.role !== 'user' || !m.content.includes('Please start the interview'))
             .map(m => `${m.role === 'user' ? candidate.name : 'Aria'}: ${m.content}`)
             .join('\n');
           const assessment = await assessInterview(fullTranscript);
           onComplete(assessment, candidate);
         });
       } else {
-        ariaSpeak(reply, () => listenToCandidate(finalMessages, newCount));
+        ariaSpeak(reply, () => listenToCandidate());
       }
     } catch (err) {
       console.error(err);
-      setStatusText('Error: ' + err.message);
+      setStatusText('Error — retrying…');
+      setTimeout(() => listenToCandidate(), 2000);
     }
   }, [ariaSpeak, candidate, onComplete]);
 
-  const listenToCandidate = useCallback((currentMessages, currentQuestionCount) => {
+  const listenToCandidate = useCallback(() => {
     setPhase(PHASES.LISTENING);
-    setStatusText('Your turn — speak your answer');
+    setStatusText('Your turn — speak your answer (speak for as long as you need)');
     setLiveText('');
-    capturedText.current = '';
 
     startListening(
-      (result) => {
-        capturedText.current = result;
-        setLiveText(result);
-      },
-      () => {
-        const answer = capturedText.current;
-        setLiveText('');
-        processAnswer(answer, currentMessages, currentQuestionCount);
-      }
+      (interim) => setLiveText(interim),
+      (finalText) => processAnswer(finalText)
     );
   }, [startListening, processAnswer]);
 
-  // Initial greeting on mount
   useEffect(() => {
     const initMessages = [{
       role: 'user',
-      content: `My name is ${candidate.name} and I want to teach ${candidate.role}. Please start the interview with a warm introduction and your first question.`,
+      content: `Hi, my name is ${candidate.name} and I want to teach ${candidate.role}. Please start the interview.`,
     }];
 
     (async () => {
       try {
-        const { reply } = await sendMessage(initMessages);
+        const { reply } = await sendMessage(initMessages, candidate);
         const aiMsg = { role: 'assistant', content: reply };
         const msgs = [...initMessages, aiMsg];
+        messagesRef.current = msgs;
         setMessages(msgs);
         setTranscript([{ speaker: 'Aria', text: reply }]);
-        ariaSpeak(reply, () => listenToCandidate(msgs, 0));
+        ariaSpeak(reply, () => listenToCandidate());
       } catch (err) {
         setStatusText('Could not connect. Error: ' + err.message);
       }
@@ -152,6 +155,26 @@ export default function InterviewPage({ candidate, onComplete }) {
             ))}
           </div>
         )}
+        {phase === PHASES.LISTENING && (
+          <button
+            onClick={() => {
+              if (recognitionRef && recognitionRef.current) recognitionRef.current.stop();
+            }}
+            style={{
+              marginTop: '1rem',
+              padding: '0.5rem 1.25rem',
+              background: '#ef4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '99px',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+              fontFamily: 'inherit'
+            }}
+          >
+            Done Speaking ✓
+          </button>
+        )}
         <div className="progress-bar">
           <div className="progress-fill" style={{ width: `${Math.min((questionCount / 5) * 100, 100)}%` }} />
         </div>
@@ -169,7 +192,7 @@ export default function InterviewPage({ candidate, onComplete }) {
           ))}
           {liveText && (
             <div className="transcript-entry candidate live">
-              <div className="entry-speaker">You (live)</div>
+              <div className="entry-speaker">You (speaking…)</div>
               <div className="entry-text">{liveText}<span className="cursor">|</span></div>
             </div>
           )}
