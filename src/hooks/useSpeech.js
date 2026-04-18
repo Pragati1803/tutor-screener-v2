@@ -7,36 +7,20 @@ export function useSpeech() {
 
   const speak = useCallback((text, onEnd) => {
     window.speechSynthesis.cancel();
-
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 0.88;
     utterance.pitch = 1.1;
     utterance.volume = 1;
 
-    const pickVoice = () => {
-      const voices = window.speechSynthesis.getVoices();
-      // Priority order: best natural English voices
-      const preferred = [
-        'Samantha',           // macOS - best
-        'Karen',              // macOS Australian
-        'Moira',              // macOS Irish  
-        'Google US English',  // Chrome
-        'Google UK English Female',
-        'Microsoft Zira',     // Windows
-        'Microsoft Jenny',    // Windows
-      ];
-      for (const name of preferred) {
-        const v = voices.find(v => v.name.includes(name));
-        if (v) return v;
-      }
-      // Fallback: any en-US female voice
-      return voices.find(v => v.lang === 'en-US' && v.name.toLowerCase().includes('female'))
-        || voices.find(v => v.lang === 'en-US')
-        || voices.find(v => v.lang.startsWith('en'));
-    };
-
     const doSpeak = () => {
-      const voice = pickVoice();
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = ['Samantha', 'Karen', 'Moira', 'Google US English', 'Google UK English Female', 'Microsoft Zira', 'Microsoft Jenny'];
+      let voice = null;
+      for (const name of preferred) {
+        voice = voices.find(v => v.name.includes(name));
+        if (voice) break;
+      }
+      if (!voice) voice = voices.find(v => v.lang === 'en-US') || voices.find(v => v.lang.startsWith('en'));
       if (voice) utterance.voice = voice;
       utterance.onstart = () => setIsSpeaking(true);
       utterance.onend = () => { setIsSpeaking(false); if (onEnd) onEnd(); };
@@ -56,85 +40,91 @@ export function useSpeech() {
     setIsSpeaking(false);
   }, []);
 
-  const startListening = useCallback((onResult, onEnd) => {
+  const startListening = useCallback((onLiveUpdate, onDone) => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       alert('Please use Google Chrome for voice support.');
       return;
     }
 
+    // Stop any existing session
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch(e) {}
+    }
+
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
-    recognition.interimResults = true;   // show words as they come
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.maxAlternatives = 1;
-    recognition.continuous = true;       // keep listening, don't stop early
-
     recognitionRef.current = recognition;
 
-    let finalTranscript = '';
+    // We accumulate FINAL results here — never reset this
+    let accumulated = '';
     let silenceTimer = null;
-    let hasStarted = false;
 
-    const resetSilenceTimer = () => {
+    const resetSilence = () => {
       clearTimeout(silenceTimer);
-      // Stop after 3 seconds of silence once they've started speaking
       silenceTimer = setTimeout(() => {
-        if (hasStarted && finalTranscript.trim()) {
-          recognition.stop();
-        }
-      }, 3000);
+        recognition.stop();
+      }, 3500); // 3.5s silence = done speaking
     };
 
     recognition.onstart = () => {
       setIsListening(true);
-      finalTranscript = '';
-      // Give 10 seconds max total listening time
-      silenceTimer = setTimeout(() => {
-        recognition.stop();
-      }, 10000);
+      accumulated = '';
     };
 
     recognition.onresult = (event) => {
-      let interim = '';
-      finalTranscript = '';
+      let interimText = '';
 
-      for (let i = 0; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript + ' ';
+      // Loop only from the last processed result
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          accumulated += result[0].transcript + ' ';
         } else {
-          interim += event.results[i][0].transcript;
+          interimText += result[0].transcript;
         }
       }
 
-      hasStarted = true;
-      onResult(finalTranscript.trim() || interim.trim());
-      resetSilenceTimer(); // reset silence timer every time we hear something
+      // Show accumulated finals + current interim
+      const display = (accumulated + interimText).trim();
+      onLiveUpdate(display);
+      resetSilence();
+    };
+
+    recognition.onspeechstart = () => {
+      resetSilence();
     };
 
     recognition.onend = () => {
       clearTimeout(silenceTimer);
       setIsListening(false);
-      if (onEnd) onEnd(finalTranscript.trim());
+      const final = accumulated.trim();
+      onDone(final);
     };
 
     recognition.onerror = (e) => {
       clearTimeout(silenceTimer);
       console.error('Speech error:', e.error);
       if (e.error === 'no-speech') {
-        // Retry once on no-speech
-        setIsListening(false);
-        if (onEnd) onEnd('');
+        // Let onend handle it naturally
         return;
       }
       setIsListening(false);
-      if (onEnd) onEnd(finalTranscript.trim());
+      onDone(accumulated.trim());
     };
 
+    // Start with a max timeout of 60 seconds
     recognition.start();
+    silenceTimer = setTimeout(() => recognition.stop(), 60000);
   }, []);
 
   const stopListening = useCallback(() => {
-    if (recognitionRef.current) recognitionRef.current.stop();
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch(e) {}
+    }
     setIsListening(false);
   }, []);
 
