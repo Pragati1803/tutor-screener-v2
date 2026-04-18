@@ -27,7 +27,7 @@ body {
 
 .app { min-height: 100vh; }
 
-/* ── WELCOME PAGE ── */
+/* â”€â”€ WELCOME PAGE â”€â”€ */
 .welcome-page {
   min-height: 100vh;
   display: flex;
@@ -167,7 +167,7 @@ body {
 .start-btn:active:not(:disabled) { transform: scale(0.98); }
 .start-btn:disabled { background: #94a3b8; cursor: not-allowed; }
 
-/* ── INTERVIEW PAGE ── */
+/* â”€â”€ INTERVIEW PAGE â”€â”€ */
 .interview-page {
   display: grid;
   grid-template-columns: 320px 1fr;
@@ -293,7 +293,7 @@ body {
   color: #64748b;
 }
 
-/* ── TRANSCRIPT PANEL ── */
+/* â”€â”€ TRANSCRIPT PANEL â”€â”€ */
 .transcript-panel {
   display: flex;
   flex-direction: column;
@@ -377,7 +377,7 @@ body {
 
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
-/* ── RESULTS PAGE ── */
+/* â”€â”€ RESULTS PAGE â”€â”€ */
 .results-page {
   min-height: 100vh;
   background: var(--cue-surface);
@@ -592,13 +592,13 @@ body {
 
 .action-btn.secondary:hover { background: var(--cue-surface); }
 
-/* ── PRINT ── */
+/* â”€â”€ PRINT â”€â”€ */
 @media print {
   .results-actions, .aria-panel { display: none; }
   .results-page { padding: 0; }
 }
 
-/* ── RESPONSIVE ── */
+/* â”€â”€ RESPONSIVE â”€â”€ */
 @media (max-width: 768px) {
   .interview-page { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .aria-panel { padding: 1.5rem; flex-direction: row; flex-wrap: wrap; height: auto; }
@@ -606,4 +606,91 @@ body {
   .aria-inner { width: 64px; height: 64px; font-size: 1.75rem; }
   .transcript-panel { height: calc(100vh - 180px); }
   .dimensions-grid { grid-template-columns: 1fr; }
+}
+
+/* â”€â”€ THANK YOU PAGE â”€â”€ */
+.thankyou-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+}
+
+.thankyou-card {
+  background: white;
+  border-radius: 20px;
+  padding: 3rem;
+  width: 100%;
+  max-width: 540px;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.25);
+  text-align: center;
+}
+
+.thankyou-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  animation: pop 0.5s ease;
+}
+
+@keyframes pop {
+  0% { transform: scale(0); opacity: 0; }
+  70% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.thankyou-card h1 {
+  font-family: var(--font-serif);
+  font-size: 2rem;
+  color: var(--cue-navy);
+  margin-bottom: 0.75rem;
+}
+
+.thankyou-subtitle {
+  color: var(--cue-muted);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  margin-bottom: 2rem;
+}
+
+.thankyou-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: left;
+  margin-bottom: 1.5rem;
+}
+
+.thankyou-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--cue-surface);
+  border-radius: var(--radius);
+}
+
+.step-icon { font-size: 1.5rem; flex-shrink: 0; }
+
+.step-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--cue-navy);
+  margin-bottom: 2px;
+}
+
+.step-desc {
+  font-size: 0.82rem;
+  color: var(--cue-muted);
+  line-height: 1.5;
+}
+
+.thankyou-note {
+  font-size: 0.85rem;
+  color: var(--cue-muted);
+  padding: 1rem;
+  background: var(--cue-blue-light);
+  border-radius: var(--radius);
+  line-height: 1.6;
 }
